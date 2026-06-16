@@ -47,6 +47,11 @@ export default function Home() {
     paramsSnapshotRef.current = { ...params };
     windSnapshotRef.current = { ...windParams };
     targetSnapshotRef.current = { ...targetParams };
+
+    // 发射前同步更新 engine 的参数（确保物理引擎使用的参数与破坏计算完全一致）
+    engineRef.current.updateParams(params);
+    engineRef.current.updateWindParams(windParams);
+
     setIsSimulating(true);
     setCurrentResult(null);
     engineRef.current.launch();

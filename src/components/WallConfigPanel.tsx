@@ -271,10 +271,10 @@ export default function WallConfigPanel() {
           </Paper>
           <Paper p="xs" withBorder style={{ backgroundColor: '#FFF7ED' }}>
             <Text size="xs" color="dimmed">
-              命中次数
+              发射/命中
             </Text>
             <Text fw={700} size="md" c="orange.7">
-              {siegeState.impactHistory.length}
+              {siegeState.totalShotsFired} / {siegeState.impactHistory.length}
             </Text>
           </Paper>
           <Paper p="xs" withBorder style={{ backgroundColor: '#F0F9FF' }}>

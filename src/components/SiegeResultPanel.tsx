@@ -68,19 +68,17 @@ export default function SiegeResultPanel() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [batchShots, setBatchShots] = useState(20);
   const [experimentName, setExperimentName] = useState('');
-  const [shotsForSave, setShotsForSave] = useState(0);
 
   const materialProps = WALL_MATERIAL_PROPERTIES[wallParams.material];
   const durabilityPercent = (siegeState.wallCurrentDurability / siegeState.wallMaxDurability) * 100;
 
   const handleRunBatch = () => {
     runSiegeBatch(batchShots);
-    setShotsForSave((prev) => prev + batchShots);
   };
 
   const handleSaveExperiment = () => {
     if (experimentName.trim()) {
-      saveSiegeExperiment(experimentName.trim(), shotsForSave);
+      saveSiegeExperiment(experimentName.trim());
       setExperimentName('');
       setSaveModalOpen(false);
     }
@@ -153,7 +151,7 @@ export default function SiegeResultPanel() {
               </ActionIcon>
             </Tooltip>
             <Tooltip label="重置城墙状态">
-              <ActionIcon variant="subtle" onClick={() => { resetSiegeState(); setShotsForSave(0); }} size="sm">
+              <ActionIcon variant="subtle" onClick={resetSiegeState} size="sm">
                 <IconRefresh size={18} />
               </ActionIcon>
             </Tooltip>
@@ -555,7 +553,7 @@ export default function SiegeResultPanel() {
               </Box>
               <Box>
                 <Text size="xs" color="dimmed">总发射数</Text>
-                <Text size="sm" fw={600}>{shotsForSave} 发</Text>
+                <Text size="sm" fw={600}>{siegeState.totalShotsFired} 发</Text>
               </Box>
               <Box>
                 <Text size="xs" color="dimmed">命中数</Text>

@@ -168,6 +168,7 @@ export interface SiegeState {
   allHeatZones: DamageHeatZone[];
   collapseProbability: number;
   isDestroyed: boolean;
+  totalShotsFired: number;
 }
 
 export interface BestParamsSuggestion {

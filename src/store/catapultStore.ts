@@ -76,7 +76,7 @@ interface CatapultState {
   applyImpactToState: (result: SingleImpactResult) => void;
   processSimulationForSiege: (simResult: SimulationResult) => void;
   runSiegeBatch: (maxShots: number) => void;
-  saveSiegeExperiment: (name: string, shotCount: number) => void;
+  saveSiegeExperiment: (name: string) => void;
   deleteSiegeExperiment: (id: string) => void;
   clearSiegeExperiments: () => void;
   loadSiegeExperiment: (id: string) => void;
@@ -312,8 +312,17 @@ export const useCatapultStore = create<CatapultState>()(
           params.projectileWeight
         );
 
+        // 无论是否命中城墙，发射数都要累加
+        set((state) => ({
+          siegeState: {
+            ...state.siegeState,
+            totalShotsFired: state.siegeState.totalShotsFired + 1,
+          },
+        }));
+
         if (hitWall && impactParams) {
-          const impactResult = calculateWallHitResult(impactParams, wallParams, siegeState);
+          const stateAfterShot = get().siegeState;
+          const impactResult = calculateWallHitResult(impactParams, wallParams, stateAfterShot);
           get().applyImpactToState(impactResult);
         }
       },
@@ -328,7 +337,10 @@ export const useCatapultStore = create<CatapultState>()(
           const result = runSiegeBatchSimulation(params, windParams, wallParams, maxShots, 0.02);
           const currentState = get().siegeState;
 
-          let mergedState = { ...currentState };
+          let mergedState = { 
+            ...currentState, 
+            totalShotsFired: currentState.totalShotsFired + result.totalShots
+          };
           result.siegeState.impactHistory.forEach((impact) => {
             mergedState = applyImpactToSiegeState(mergedState, impact);
           });
@@ -343,11 +355,12 @@ export const useCatapultStore = create<CatapultState>()(
         }, 50);
       },
 
-      saveSiegeExperiment: (name, shotCount) => {
+      saveSiegeExperiment: (name) => {
         const { wallParams, params, windParams, siegeState } = get();
         if (siegeState.impactHistory.length === 0) return;
 
-        const totalProjectilesKg = siegeState.impactHistory.length * params.projectileWeight;
+        const shotCount = siegeState.totalShotsFired;
+        const totalProjectilesKg = shotCount * params.projectileWeight;
         const totalCounterweightKg = params.counterweight * shotCount * 0.01;
         const totalKg = totalProjectilesKg + totalCounterweightKg;
 
@@ -418,6 +431,7 @@ export const useCatapultStore = create<CatapultState>()(
               allHeatZones: experiment.impactHistory.map((h) => h.heatZone),
               collapseProbability: experiment.impactHistory[experiment.impactHistory.length - 1]?.collapseRisk ?? 0,
               isDestroyed: experiment.wallDestroyed,
+              totalShotsFired: experiment.totalShotsFired,
             },
             activeSiegeExperimentId: id,
             currentImpactResult: experiment.impactHistory[experiment.impactHistory.length - 1] || null,

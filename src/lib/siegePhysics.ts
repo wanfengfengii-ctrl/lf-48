@@ -263,6 +263,7 @@ export function createInitialSiegeState(wallParams: WallParams): SiegeState {
     allHeatZones: [],
     collapseProbability: 0,
     isDestroyed: false,
+    totalShotsFired: 0,
   };
 }
 
@@ -289,6 +290,7 @@ export function applyImpactToSiegeState(
     allHeatZones: [...prevState.allHeatZones, impactResult.heatZone],
     collapseProbability: impactResult.collapseRisk,
     isDestroyed,
+    totalShotsFired: prevState.totalShotsFired,
   };
 }
 
