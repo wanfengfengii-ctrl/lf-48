@@ -104,6 +104,7 @@ export default function Home() {
           <Grid.Col span={{ base: 12, md: 6, lg: 5 }}>
             <SimulationCanvas
               params={params}
+              windParams={windParams}
               isSimulating={isSimulating}
               onLaunch={handleLaunch}
               onSimulationComplete={handleSimulationComplete}

@@ -1,5 +1,5 @@
 import Matter from 'matter-js';
-import { CatapultParams } from '@/types/catapult';
+import { CatapultParams, WindParams } from '@/types/catapult';
 import { calculateInitialVelocity } from './physics';
 
 const { Engine, Render, Runner, Bodies, Composite, Body, Events } = Matter;
@@ -10,12 +10,16 @@ export interface EngineCallbacks {
   onProjectileLand?: (x: number) => void;
 }
 
+const AIR_DENSITY = 1.225;
+const PROJECTILE_RADIUS_M = 0.05;
+
 export class CatapultEngine {
   private engine: Matter.Engine;
   private render: Matter.Render;
   private runner: Matter.Runner;
   private container: HTMLElement;
   private params: CatapultParams;
+  private windParams: WindParams;
   private callbacks: EngineCallbacks;
 
   private projectile: Matter.Body | null = null;
@@ -30,9 +34,10 @@ export class CatapultEngine {
   private hasLanded = false;
   private trajectoryPoints: { x: number; y: number }[] = [];
 
-  constructor(container: HTMLElement, params: CatapultParams, callbacks: EngineCallbacks = {}) {
+  constructor(container: HTMLElement, params: CatapultParams, windParams: WindParams, callbacks: EngineCallbacks = {}) {
     this.container = container;
     this.params = params;
+    this.windParams = windParams;
     this.callbacks = callbacks;
 
     const width = container.clientWidth || 900;
@@ -165,6 +170,47 @@ export class CatapultEngine {
 
     this.base = baseBody;
 
+    Events.on(this.engine, 'beforeUpdate', () => {
+      if (this.projectile && this.isLaunched && !this.hasLanded) {
+        const { windSpeed, windDirection, dragCoefficient } = this.windParams;
+        const projectile = this.projectile;
+
+        if (windSpeed > 0 || dragCoefficient > 0) {
+          const v = projectile.velocity;
+          const windDirRad = (windDirection * Math.PI) / 180;
+          const crossSectionalArea = Math.PI * PROJECTILE_RADIUS_M * PROJECTILE_RADIUS_M;
+
+          const windVx = windSpeed * Math.cos(windDirRad);
+          const windVy = 0;
+
+          const relVx = (v.x / (this.scale * 0.35)) - windVx;
+          const relVy = (v.y / (this.scale * 0.35)) - windVy;
+          const relSpeed = Math.sqrt(relVx * relVx + relVy * relVy);
+
+          let dragForce = 0;
+          if (relSpeed > 0.001 && dragCoefficient > 0) {
+            dragForce = 0.5 * dragCoefficient * AIR_DENSITY * crossSectionalArea * relSpeed * relSpeed;
+          }
+
+          const mass = this.params.projectileWeight;
+          let ax = -dragForce * relVx / (mass * (relSpeed || 1));
+          let ay = -dragForce * relVy / (mass * (relSpeed || 1));
+
+          if (windSpeed > 0) {
+            const windForce = 0.5 * Math.max(dragCoefficient, 0.1) * AIR_DENSITY * crossSectionalArea * windSpeed * windSpeed;
+            ax += windForce * Math.cos(windDirRad) / mass;
+            ay += windForce * Math.sin(windDirRad) / mass * 0.1;
+          }
+
+          const dt = 1000 / 60 / 1000;
+          Body.setVelocity(projectile, {
+            x: v.x + ax * dt * this.scale * 0.35,
+            y: v.y + ay * dt * this.scale * 0.35,
+          });
+        }
+      }
+    });
+
     Events.on(this.engine, 'afterUpdate', () => {
       if (this.projectile && this.isLaunched && !this.hasLanded) {
         const pos = this.projectile.position;
@@ -223,6 +269,10 @@ export class CatapultEngine {
   public updateParams(params: CatapultParams) {
     this.params = params;
     this.reset();
+  }
+
+  public updateWindParams(windParams: WindParams) {
+    this.windParams = windParams;
   }
 
   public resize(width: number, height: number) {

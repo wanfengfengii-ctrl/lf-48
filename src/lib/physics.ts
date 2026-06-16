@@ -6,8 +6,6 @@ import {
   BatchShotResult,
   BatchExperimentStats,
   TrajectoryPoint3D,
-  TARGET_MIN_DISTANCE,
-  TARGET_MAX_DISTANCE,
   RANGE_LIMIT,
 } from '@/types/catapult';
 
@@ -131,9 +129,9 @@ export function runSimulation(
   const hitError = targetDeviation;
 
   let status: 'hit' | 'too_close' | 'too_far';
-  if (x >= TARGET_MIN_DISTANCE && x <= TARGET_MAX_DISTANCE) {
+  if (isTargetHit) {
     status = 'hit';
-  } else if (x < TARGET_MIN_DISTANCE) {
+  } else if (x < targetDistance) {
     status = 'too_close';
   } else {
     status = 'too_far';

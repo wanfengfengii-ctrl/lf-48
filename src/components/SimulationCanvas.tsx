@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Paper, Box } from '@mantine/core';
 import { CatapultEngine } from '@/lib/catapultEngine';
-import { CatapultParams } from '@/types/catapult';
+import { CatapultParams, WindParams } from '@/types/catapult';
 import { TARGET_MIN_DISTANCE, TARGET_MAX_DISTANCE } from '@/types/catapult';
 import { useCatapultStore } from '@/store/catapultStore';
 
 interface SimulationCanvasProps {
   params: CatapultParams;
+  windParams: WindParams;
   isSimulating: boolean;
   onLaunch: () => void;
   onSimulationComplete: () => void;
@@ -18,6 +19,7 @@ const PIVOT_X = 120;
 
 export default function SimulationCanvas({
   params,
+  windParams,
   isSimulating,
   onSimulationComplete,
   engineRef,
@@ -25,12 +27,13 @@ export default function SimulationCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const prevParamsRef = useRef(params);
-  const { windParams, targetParams } = useCatapultStore();
+  const prevWindParamsRef = useRef(windParams);
+  const { targetParams } = useCatapultStore();
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const engine = new CatapultEngine(containerRef.current, params, {
+    const engine = new CatapultEngine(containerRef.current, params, windParams, {
       onSimulationComplete,
     });
     engine.start();
@@ -63,6 +66,18 @@ export default function SimulationCanvas({
       prevParamsRef.current = params;
     }
   }, [params, isSimulating, engineRef]);
+
+  useEffect(() => {
+    const windChanged =
+      prevWindParamsRef.current.windSpeed !== windParams.windSpeed ||
+      prevWindParamsRef.current.windDirection !== windParams.windDirection ||
+      prevWindParamsRef.current.dragCoefficient !== windParams.dragCoefficient;
+
+    if (windChanged && engineRef.current) {
+      engineRef.current.updateWindParams(windParams);
+      prevWindParamsRef.current = windParams;
+    }
+  }, [windParams, engineRef]);
 
   useEffect(() => {
     const overlay = overlayCanvasRef.current;

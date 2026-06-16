@@ -25,7 +25,6 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { TARGET_MIN_DISTANCE, TARGET_MAX_DISTANCE } from '@/types/catapult';
 
 function StatusBadge({ status }: { status: SimulationResult['status'] }) {
   if (status === 'hit') {
@@ -37,13 +36,13 @@ function StatusBadge({ status }: { status: SimulationResult['status'] }) {
   } else if (status === 'too_close') {
     return (
       <Badge color="yellow" size="lg" leftSection={<IconAlertTriangle size={14} />}>
-        落点过近
+        未命中（偏近）
       </Badge>
     );
   } else {
     return (
       <Badge color="red" size="lg" leftSection={<IconCircleX size={14} />}>
-        超出靶场
+        未命中（偏远）
       </Badge>
     );
   }
@@ -101,7 +100,7 @@ export default function ResultPanel() {
             <Group gap="xs">
               <IconAlertTriangle size={18} color="#CA8A04" />
               <Text size="sm" c="yellow.8" fw={500}>
-                提示：弹丸落点过近（{currentResult.distance}m），未进入靶场范围（{TARGET_MIN_DISTANCE}-{TARGET_MAX_DISTANCE}m）
+                提示：弹丸落点过近（{currentResult.distance}m），距离目标靶心（{targetParams.targetDistance}m）还差 {Math.round((targetParams.targetDistance - currentResult.distance) * 100) / 100}m
               </Text>
             </Group>
           </Box>
@@ -112,7 +111,7 @@ export default function ResultPanel() {
             <Group gap="xs">
               <IconAlertTriangle size={18} color="#C2410C" />
               <Text size="sm" c="orange.8" fw={500}>
-                提示：弹丸落点过远（{currentResult.distance}m），超出靶场范围（{TARGET_MIN_DISTANCE}-{TARGET_MAX_DISTANCE}m）
+                提示：弹丸落点过远（{currentResult.distance}m），超出目标靶心（{targetParams.targetDistance}m）{Math.round((currentResult.distance - targetParams.targetDistance) * 100) / 100}m
               </Text>
             </Group>
           </Box>
@@ -268,7 +267,7 @@ export default function ResultPanel() {
                   name="距离"
                   unit="m"
                   tick={{ fontSize: 11 }}
-                  domain={[0, Math.max(TARGET_MAX_DISTANCE + 30, currentResult.distance + 20)]}
+                  domain={[0, Math.max(targetParams.targetDistance + 30, currentResult.distance + 20)]}
                 />
                 <YAxis
                   type="number"
@@ -283,16 +282,16 @@ export default function ResultPanel() {
                   contentStyle={{ fontSize: 12, borderRadius: 6 }}
                 />
                 <ReferenceLine
-                  x={TARGET_MIN_DISTANCE}
+                  x={targetParams.targetDistance - targetParams.targetRadius}
                   stroke="#22C55E"
                   strokeDasharray="3 3"
-                  label={{ value: `${TARGET_MIN_DISTANCE}m`, position: 'top', fontSize: 10, fill: '#22C55E' }}
+                  label={{ value: `靶区起点`, position: 'top', fontSize: 10, fill: '#22C55E' }}
                 />
                 <ReferenceLine
-                  x={TARGET_MAX_DISTANCE}
+                  x={targetParams.targetDistance + targetParams.targetRadius}
                   stroke="#22C55E"
                   strokeDasharray="3 3"
-                  label={{ value: `${TARGET_MAX_DISTANCE}m`, position: 'top', fontSize: 10, fill: '#22C55E' }}
+                  label={{ value: `靶区终点`, position: 'top', fontSize: 10, fill: '#22C55E' }}
                 />
                 <ReferenceLine
                   x={targetParams.targetDistance}
@@ -329,7 +328,7 @@ export default function ResultPanel() {
                   name="距离"
                   unit="m"
                   tick={{ fontSize: 11 }}
-                  domain={[0, Math.max(TARGET_MAX_DISTANCE + 30, currentResult.distance + 20)]}
+                  domain={[0, Math.max(targetParams.targetDistance + 30, currentResult.distance + 20)]}
                 />
                 <YAxis
                   type="number"
