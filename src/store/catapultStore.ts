@@ -11,8 +11,23 @@ import {
   DEFAULT_PARAMS,
   DEFAULT_WIND_PARAMS,
   DEFAULT_TARGET_PARAMS,
+  WallParams,
+  DEFAULT_WALL_PARAMS,
+  SiegeState,
+  SingleImpactResult,
+  SiegeExperimentResult,
+  BestParamsSuggestion,
 } from '@/types/catapult';
 import { runSimulation, runBatchSimulation } from '@/lib/physics';
+import {
+  createInitialSiegeState,
+  applyImpactToSiegeState,
+  calculateWallHitResult,
+  extractImpactParamsFromSimulation,
+  findBestBreakParams,
+  runSiegeBatchSimulation,
+  calculateWallMaxDurability,
+} from '@/lib/siegePhysics';
 
 interface CatapultState {
   params: CatapultParams;
@@ -26,6 +41,13 @@ interface CatapultState {
   isSimulating: boolean;
   isBatchSimulating: boolean;
   activeExperimentId: string | null;
+  wallParams: WallParams;
+  siegeState: SiegeState;
+  currentImpactResult: SingleImpactResult | null;
+  siegeExperiments: SiegeExperimentResult[];
+  isSiegeSimulating: boolean;
+  activeSiegeExperimentId: string | null;
+  bestParamsSuggestion: BestParamsSuggestion | null;
   setParams: (params: Partial<CatapultParams>) => void;
   resetParams: () => void;
   setWindParams: (params: Partial<WindParams>) => void;
@@ -35,6 +57,7 @@ interface CatapultState {
   setCurrentResult: (result: SimulationResult | null) => void;
   setIsSimulating: (simulating: boolean) => void;
   runSingleSimulation: () => void;
+  runSingleSimulationWithSiege: () => void;
   runBatchSimulation: (shotCount: number, randomness?: number) => void;
   stopBatchSimulation: () => void;
   clearCurrentBatch: () => void;
@@ -47,6 +70,18 @@ interface CatapultState {
   clearBatchExperiments: () => void;
   loadBatchExperiment: (id: string) => void;
   setActiveExperiment: (id: string | null) => void;
+  setWallParams: (params: Partial<WallParams>) => void;
+  resetWallParams: () => void;
+  resetSiegeState: () => void;
+  applyImpactToState: (result: SingleImpactResult) => void;
+  processSimulationForSiege: (simResult: SimulationResult) => void;
+  runSiegeBatch: (maxShots: number) => void;
+  saveSiegeExperiment: (name: string, shotCount: number) => void;
+  deleteSiegeExperiment: (id: string) => void;
+  clearSiegeExperiments: () => void;
+  loadSiegeExperiment: (id: string) => void;
+  setActiveSiegeExperiment: (id: string | null) => void;
+  computeBestParams: () => void;
 }
 
 export const useCatapultStore = create<CatapultState>()(
@@ -63,6 +98,13 @@ export const useCatapultStore = create<CatapultState>()(
       isSimulating: false,
       isBatchSimulating: false,
       activeExperimentId: null,
+      wallParams: { ...DEFAULT_WALL_PARAMS },
+      siegeState: createInitialSiegeState(DEFAULT_WALL_PARAMS),
+      currentImpactResult: null,
+      siegeExperiments: [],
+      isSiegeSimulating: false,
+      activeSiegeExperimentId: null,
+      bestParamsSuggestion: null,
 
       setParams: (newParams) => {
         set((state) => ({
@@ -109,6 +151,13 @@ export const useCatapultStore = create<CatapultState>()(
         const { params, windParams, targetParams } = get();
         const result = runSimulation(params, windParams, targetParams);
         set({ currentResult: result });
+      },
+
+      runSingleSimulationWithSiege: () => {
+        const { params, windParams, targetParams } = get();
+        const result = runSimulation(params, windParams, targetParams);
+        set({ currentResult: result });
+        get().processSimulationForSiege(result);
       },
 
       runBatchSimulation: (shotCount: number, randomness: number = 0.02) => {
@@ -218,12 +267,180 @@ export const useCatapultStore = create<CatapultState>()(
       setActiveExperiment: (id) => {
         set({ activeExperimentId: id });
       },
+
+      setWallParams: (newWallParams) => {
+        set((state) => {
+          const updatedWall = { ...state.wallParams, ...newWallParams };
+          return {
+            wallParams: updatedWall,
+            siegeState: createInitialSiegeState(updatedWall),
+            currentImpactResult: null,
+          };
+        });
+      },
+
+      resetWallParams: () => {
+        set({
+          wallParams: { ...DEFAULT_WALL_PARAMS },
+          siegeState: createInitialSiegeState(DEFAULT_WALL_PARAMS),
+          currentImpactResult: null,
+        });
+      },
+
+      resetSiegeState: () => {
+        const { wallParams } = get();
+        set({
+          siegeState: createInitialSiegeState(wallParams),
+          currentImpactResult: null,
+        });
+      },
+
+      applyImpactToState: (impactResult) => {
+        set((state) => ({
+          siegeState: applyImpactToSiegeState(state.siegeState, impactResult),
+          currentImpactResult: impactResult,
+        }));
+      },
+
+      processSimulationForSiege: (simResult) => {
+        const { wallParams, siegeState, params } = get();
+        if (siegeState.isDestroyed) return;
+
+        const { impactParams, hitWall } = extractImpactParamsFromSimulation(
+          simResult,
+          wallParams,
+          params.projectileWeight
+        );
+
+        if (hitWall && impactParams) {
+          const impactResult = calculateWallHitResult(impactParams, wallParams, siegeState);
+          get().applyImpactToState(impactResult);
+        }
+      },
+
+      runSiegeBatch: (maxShots: number) => {
+        const { params, windParams, wallParams, siegeState } = get();
+        if (siegeState.isDestroyed) return;
+
+        set({ isSiegeSimulating: true });
+
+        setTimeout(() => {
+          const result = runSiegeBatchSimulation(params, windParams, wallParams, maxShots, 0.02);
+          const currentState = get().siegeState;
+
+          let mergedState = { ...currentState };
+          result.siegeState.impactHistory.forEach((impact) => {
+            mergedState = applyImpactToSiegeState(mergedState, impact);
+          });
+
+          const lastImpact = result.siegeState.impactHistory[result.siegeState.impactHistory.length - 1] || null;
+
+          set({
+            siegeState: mergedState,
+            currentImpactResult: lastImpact,
+            isSiegeSimulating: false,
+          });
+        }, 50);
+      },
+
+      saveSiegeExperiment: (name, shotCount) => {
+        const { wallParams, params, windParams, siegeState } = get();
+        if (siegeState.impactHistory.length === 0) return;
+
+        const totalProjectilesKg = siegeState.impactHistory.length * params.projectileWeight;
+        const totalCounterweightKg = params.counterweight * shotCount * 0.01;
+        const totalKg = totalProjectilesKg + totalCounterweightKg;
+
+        const avgDamage = siegeState.totalDamageScore / Math.max(1, siegeState.impactHistory.length);
+        const maxPen = siegeState.impactHistory.reduce((m, i) => Math.max(m, i.penetrationDepth), 0);
+
+        const resourceEfficiency = totalKg > 0 ? siegeState.totalDamageScore / totalKg : 0;
+        const damageEfficiency = shotCount > 0 ? siegeState.totalDamageScore / shotCount : 0;
+
+        const newExperiment: SiegeExperimentResult = {
+          id: Date.now().toString(),
+          name,
+          wallParams: { ...wallParams },
+          catapultParams: { ...params },
+          windParams: { ...windParams },
+          shotCount,
+          totalShotsFired: shotCount,
+          hitsOnWall: siegeState.impactHistory.length,
+          wallDestroyed: siegeState.isDestroyed,
+          shotsToDestroy: siegeState.isDestroyed ? siegeState.impactHistory.length : null,
+          totalDamageScore: siegeState.totalDamageScore,
+          maxPenetrationDepth: maxPen,
+          avgDamagePerShot: Math.round(avgDamage * 100) / 100,
+          resourceConsumption: {
+            counterweightKg: Math.round(totalCounterweightKg * 100) / 100,
+            projectilesKg: totalProjectilesKg,
+            totalKg: Math.round(totalKg * 100) / 100,
+          },
+          damageEfficiency: Math.round(damageEfficiency * 100) / 100,
+          resourceEfficiency: Math.round(resourceEfficiency * 10000) / 100,
+          durabilityCurve: [...siegeState.durabilityCurve],
+          impactHistory: [...siegeState.impactHistory],
+          timestamp: Date.now(),
+        };
+
+        set((state) => ({
+          siegeExperiments: [...state.siegeExperiments, newExperiment],
+          activeSiegeExperimentId: newExperiment.id,
+        }));
+      },
+
+      deleteSiegeExperiment: (id) => {
+        set((state) => ({
+          siegeExperiments: state.siegeExperiments.filter((e) => e.id !== id),
+          activeSiegeExperimentId: state.activeSiegeExperimentId === id ? null : state.activeSiegeExperimentId,
+        }));
+      },
+
+      clearSiegeExperiments: () => {
+        set({ siegeExperiments: [], activeSiegeExperimentId: null });
+      },
+
+      loadSiegeExperiment: (id) => {
+        const experiment = get().siegeExperiments.find((e) => e.id === id);
+        if (experiment) {
+          const maxDur = calculateWallMaxDurability(experiment.wallParams);
+          set({
+            wallParams: { ...experiment.wallParams },
+            params: { ...experiment.catapultParams },
+            windParams: { ...experiment.windParams },
+            siegeState: {
+              wallCurrentDurability: experiment.durabilityCurve[experiment.durabilityCurve.length - 1]?.durability ?? maxDur,
+              wallMaxDurability: maxDur,
+              totalDamageScore: experiment.totalDamageScore,
+              impactHistory: [...experiment.impactHistory],
+              durabilityCurve: [...experiment.durabilityCurve],
+              allCracks: experiment.impactHistory.flatMap((h) => h.crackPropagation),
+              allHeatZones: experiment.impactHistory.map((h) => h.heatZone),
+              collapseProbability: experiment.impactHistory[experiment.impactHistory.length - 1]?.collapseRisk ?? 0,
+              isDestroyed: experiment.wallDestroyed,
+            },
+            activeSiegeExperimentId: id,
+            currentImpactResult: experiment.impactHistory[experiment.impactHistory.length - 1] || null,
+          });
+        }
+      },
+
+      setActiveSiegeExperiment: (id) => {
+        set({ activeSiegeExperimentId: id });
+      },
+
+      computeBestParams: () => {
+        const { wallParams, targetParams } = get();
+        const suggestion = findBestBreakParams(wallParams, targetParams.targetDistance);
+        set({ bestParamsSuggestion: suggestion });
+      },
     }),
     {
       name: 'catapult-storage',
       partialize: (state) => ({
         savedSchemes: state.savedSchemes,
         batchExperiments: state.batchExperiments,
+        siegeExperiments: state.siegeExperiments,
       }),
     }
   )
