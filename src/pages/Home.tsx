@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useCallback } from 'react';
 import { Container, Grid, Title, Text, Group, Paper, Badge } from '@mantine/core';
 import { IconCat } from '@tabler/icons-react';
 import ControlPanel from '@/components/ControlPanel';
@@ -8,23 +8,25 @@ import SchemesPanel from '@/components/SchemesPanel';
 import { useCatapultStore } from '@/store/catapultStore';
 import { CatapultEngine } from '@/lib/catapultEngine';
 import { runSimulation } from '@/lib/physics';
-import { useCallback } from 'react';
 
 export default function Home() {
   const { params, setIsSimulating, setCurrentResult, isSimulating } = useCatapultStore();
   const engineRef = useRef<CatapultEngine | null>(null);
+  const paramsSnapshotRef = useRef(params);
+
+  const handleSimulationComplete = useCallback(() => {
+    const result = runSimulation(paramsSnapshotRef.current);
+    setCurrentResult(result);
+    setIsSimulating(false);
+  }, [setCurrentResult, setIsSimulating]);
 
   const handleLaunch = useCallback(() => {
     if (!engineRef.current || isSimulating) return;
 
+    paramsSnapshotRef.current = { ...params };
     setIsSimulating(true);
+    setCurrentResult(null);
     engineRef.current.launch();
-
-    setTimeout(() => {
-      const result = runSimulation(params);
-      setCurrentResult(result);
-      setIsSimulating(false);
-    }, 1500);
   }, [params, isSimulating, setCurrentResult, setIsSimulating]);
 
   const handleReset = useCallback(() => {
@@ -88,7 +90,7 @@ export default function Home() {
               params={params}
               isSimulating={isSimulating}
               onLaunch={handleLaunch}
-              onSimulationComplete={() => {}}
+              onSimulationComplete={handleSimulationComplete}
               engineRef={engineRef}
             />
           </Grid.Col>

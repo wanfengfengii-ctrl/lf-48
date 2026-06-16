@@ -18,6 +18,7 @@ const PIVOT_X = 120;
 export default function SimulationCanvas({
   params,
   isSimulating,
+  onSimulationComplete,
   engineRef,
 }: SimulationCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,7 +28,9 @@ export default function SimulationCanvas({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const engine = new CatapultEngine(containerRef.current, params, {});
+    const engine = new CatapultEngine(containerRef.current, params, {
+      onSimulationComplete,
+    });
     engine.start();
     engineRef.current = engine;
 

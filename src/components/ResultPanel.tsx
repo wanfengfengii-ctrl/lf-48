@@ -68,6 +68,8 @@ export default function ResultPanel() {
     .filter((_, i) => i % 3 === 0)
     .map((p) => ({ ...p }));
 
+  const isTooClose = currentResult.status === 'too_close';
+  const isTooFar = currentResult.status === 'too_far';
   const isOutOfRange = currentResult.distance >= RANGE_LIMIT;
 
   return (
@@ -80,12 +82,34 @@ export default function ResultPanel() {
           <StatusBadge status={currentResult.status} />
         </Group>
 
+        {isTooClose && (
+          <Box p="sm" style={{ backgroundColor: '#FEF9C3', borderRadius: 6, border: '1px solid #FDE047' }}>
+            <Group gap="xs">
+              <IconAlertTriangle size={18} color="#CA8A04" />
+              <Text size="sm" c="yellow.8" fw={500}>
+                提示：弹丸落点过近（{currentResult.distance}m），未进入靶场范围（{TARGET_MIN_DISTANCE}-{TARGET_MAX_DISTANCE}m）
+              </Text>
+            </Group>
+          </Box>
+        )}
+
+        {isTooFar && !isOutOfRange && (
+          <Box p="sm" style={{ backgroundColor: '#FFEDD5', borderRadius: 6, border: '1px solid #FDBA74' }}>
+            <Group gap="xs">
+              <IconAlertTriangle size={18} color="#C2410C" />
+              <Text size="sm" c="orange.8" fw={500}>
+                提示：弹丸落点过远（{currentResult.distance}m），超出靶场范围（{TARGET_MIN_DISTANCE}-{TARGET_MAX_DISTANCE}m）
+              </Text>
+            </Group>
+          </Box>
+        )}
+
         {isOutOfRange && (
           <Box p="sm" style={{ backgroundColor: '#FEF2F2', borderRadius: 6, border: '1px solid #FECACA' }}>
             <Group gap="xs">
               <IconAlertTriangle size={18} color="#DC2626" />
               <Text size="sm" color="red" fw={500}>
-                警告：弹丸超出靶场范围 (最大 {RANGE_LIMIT}m)
+                警告：弹丸超出最大靶场范围 (最大 {RANGE_LIMIT}m)
               </Text>
             </Group>
           </Box>
