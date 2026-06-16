@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { Container, Grid, Title, Text, Group, Paper, Badge, Stack, Tabs } from '@mantine/core';
-import { IconCat, IconWind, IconShield, IconChartBar } from '@tabler/icons-react';
+import { IconCat, IconWind, IconShield, IconChartBar, IconMoon, IconSwords } from '@tabler/icons-react';
 import ControlPanel from '@/components/ControlPanel';
 import WindControlPanel from '@/components/WindControlPanel';
 import SimulationCanvas from '@/components/SimulationCanvas';
@@ -11,19 +11,26 @@ import ExperimentsPanel from '@/components/ExperimentsPanel';
 import WallConfigPanel from '@/components/WallConfigPanel';
 import SiegeResultPanel from '@/components/SiegeResultPanel';
 import SiegeComparePanel from '@/components/SiegeComparePanel';
+import EnvironmentControlPanel from '@/components/EnvironmentControlPanel';
+import LogisticsPanel from '@/components/LogisticsPanel';
+import TacticalComparePanel from '@/components/TacticalComparePanel';
 import { useCatapultStore } from '@/store/catapultStore';
 import { CatapultEngine } from '@/lib/catapultEngine';
 import { runSimulation } from '@/lib/physics';
+import { modifyWindParams } from '@/lib/environment';
 
 export default function Home() {
   const {
     params,
     windParams,
     targetParams,
+    environmentParams,
     setIsSimulating,
     setCurrentResult,
     isSimulating,
     processSimulationForSiege,
+    consumeShotLogistics,
+    logisticsState,
   } = useCatapultStore();
   const engineRef = useRef<CatapultEngine | null>(null);
   const paramsSnapshotRef = useRef(params);
@@ -31,31 +38,37 @@ export default function Home() {
   const targetSnapshotRef = useRef(targetParams);
 
   const handleSimulationComplete = useCallback(() => {
+    const modifiedWind = modifyWindParams(windSnapshotRef.current, environmentParams);
     const result = runSimulation(
       paramsSnapshotRef.current,
-      windSnapshotRef.current,
+      modifiedWind,
       targetSnapshotRef.current
     );
     setCurrentResult(result);
     processSimulationForSiege(result);
     setIsSimulating(false);
-  }, [setCurrentResult, setIsSimulating, processSimulationForSiege]);
+  }, [setCurrentResult, setIsSimulating, processSimulationForSiege, environmentParams]);
 
   const handleLaunch = useCallback(() => {
     if (!engineRef.current || isSimulating) return;
+
+    if (logisticsState.projectileStock < 1 || logisticsState.soldierStamina < 5) {
+      return;
+    }
 
     paramsSnapshotRef.current = { ...params };
     windSnapshotRef.current = { ...windParams };
     targetSnapshotRef.current = { ...targetParams };
 
-    // 发射前同步更新 engine 的参数（确保物理引擎使用的参数与破坏计算完全一致）
     engineRef.current.updateParams(params);
     engineRef.current.updateWindParams(windParams);
+
+    consumeShotLogistics();
 
     setIsSimulating(true);
     setCurrentResult(null);
     engineRef.current.launch();
-  }, [params, windParams, targetParams, isSimulating, setCurrentResult, setIsSimulating]);
+  }, [params, windParams, targetParams, isSimulating, setCurrentResult, setIsSimulating, consumeShotLogistics, logisticsState]);
 
   const handleReset = useCallback(() => {
     if (engineRef.current) {
@@ -119,6 +132,9 @@ export default function Home() {
             </Tabs.Tab>
             <Tabs.Tab value="siege" leftSection={<IconShield size={16} />}>
               攻城破坏评估
+            </Tabs.Tab>
+            <Tabs.Tab value="nightSiege" leftSection={<IconMoon size={16} />}>
+              夜战攻城与后勤
             </Tabs.Tab>
           </Tabs.List>
 
@@ -218,10 +234,65 @@ export default function Home() {
               </Grid.Col>
             </Grid>
           </Tabs.Panel>
+
+          <Tabs.Panel value="nightSiege" pt="md">
+            <Grid gutter="md">
+              <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+                <Stack gap="md">
+                  <WallConfigPanel />
+                  <EnvironmentControlPanel />
+                </Stack>
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 6, lg: 2 }}>
+                <Stack gap="md">
+                  <WindControlPanel disabled={isSimulating} />
+                  <ControlPanel
+                    onLaunch={handleLaunch}
+                    onReset={handleReset}
+                    disabled={isSimulating || logisticsState.projectileStock < 1}
+                  />
+                </Stack>
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 12, lg: 4 }}>
+                <SimulationCanvas
+                  params={params}
+                  windParams={windParams}
+                  isSimulating={isSimulating}
+                  onLaunch={handleLaunch}
+                  onSimulationComplete={handleSimulationComplete}
+                  engineRef={engineRef}
+                />
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 12, lg: 3 }}>
+                <Stack gap="md">
+                  <SiegeResultPanel />
+                  <LogisticsPanel />
+                </Stack>
+              </Grid.Col>
+            </Grid>
+
+            <Grid gutter="md" mt="md">
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <BatchExperimentPanel />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TacticalComparePanel />
+              </Grid.Col>
+            </Grid>
+
+            <Grid gutter="md" mt="md">
+              <Grid.Col span={12}>
+                <SchemesPanel />
+              </Grid.Col>
+            </Grid>
+          </Tabs.Panel>
         </Tabs>
 
         <Text size="xs" c="dimmed" ta="center" mt="xl" pb="md">
-          古代抛石机模拟器 · 风场与命中精度实验 · 攻城破坏评估系统 · 基于 React + TypeScript +
+          古代抛石机模拟器 · 风场与命中精度实验 · 攻城破坏评估 · 夜战攻城与后勤补给系统 · 基于 React + TypeScript +
           Mantine + Matter.js + Recharts 构建
         </Text>
       </Container>

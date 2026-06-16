@@ -301,3 +301,191 @@ export const DEFAULT_TARGET_PARAMS: TargetParams = {
   targetDistance: 115,
   targetRadius: 5,
 };
+
+export type TimeOfDay = 'dawn' | 'day' | 'dusk' | 'night';
+export type WeatherType = 'clear' | 'cloudy' | 'fog' | 'rain' | 'storm';
+export type MoonPhase = 'new' | 'crescent' | 'quarter' | 'gibbous' | 'full';
+
+export interface EnvironmentParams {
+  timeOfDay: TimeOfDay;
+  weather: WeatherType;
+  moonPhase: MoonPhase;
+  torchCount: number;
+  visibility: number;
+}
+
+export const TIME_OF_DAY_LABELS: Record<TimeOfDay, string> = {
+  dawn: '黎明',
+  day: '白昼',
+  dusk: '黄昏',
+  night: '夜间',
+};
+
+export const WEATHER_LABELS: Record<WeatherType, string> = {
+  clear: '晴朗',
+  cloudy: '多云',
+  fog: '大雾',
+  rain: '降雨',
+  storm: '暴风雨',
+};
+
+export const MOON_PHASE_LABELS: Record<MoonPhase, string> = {
+  new: '新月',
+  crescent: '蛾眉月',
+  quarter: '上弦月',
+  gibbous: '盈凸月',
+  full: '满月',
+};
+
+export const DEFAULT_ENVIRONMENT_PARAMS: EnvironmentParams = {
+  timeOfDay: 'day',
+  weather: 'clear',
+  moonPhase: 'full',
+  torchCount: 0,
+  visibility: 100,
+};
+
+export interface LogisticsState {
+  projectileStock: number;
+  counterweightStock: number;
+  repairMaterials: number;
+  soldierStamina: number;
+  maxProjectileStock: number;
+  maxCounterweightStock: number;
+  maxRepairMaterials: number;
+  maxSoldierStamina: number;
+  shotsFiredInSession: number;
+  totalRepairCount: number;
+  totalFatigueAccumulated: number;
+}
+
+export const DEFAULT_LOGISTICS_STATE: LogisticsState = {
+  projectileStock: 50,
+  counterweightStock: 200,
+  repairMaterials: 100,
+  soldierStamina: 100,
+  maxProjectileStock: 200,
+  maxCounterweightStock: 1000,
+  maxRepairMaterials: 500,
+  maxSoldierStamina: 100,
+  shotsFiredInSession: 0,
+  totalRepairCount: 0,
+  totalFatigueAccumulated: 0,
+};
+
+export interface ShotLogisticsCost {
+  projectileUsed: number;
+  counterweightUsed: number;
+  staminaUsed: number;
+  wearAndTear: number;
+}
+
+export interface RepairResult {
+  materialsUsed: number;
+  staminaUsed: number;
+  repairAmount: number;
+  timeTaken: number;
+}
+
+export interface NightBattleStats {
+  nightSuccessRate: number;
+  visibilityPenalty: number;
+  accuracyModifier: number;
+  windSensitivity: number;
+  torchEffectiveness: number;
+  moonEffectiveness: number;
+}
+
+export interface TacticalCombo {
+  id: string;
+  name: string;
+  description: string;
+  timeOfDay: TimeOfDay;
+  weather: WeatherType;
+  moonPhase: MoonPhase;
+  torchCount: number;
+  projectileWeight: number;
+  counterweight: number;
+  releaseAngle: number;
+  shotInterval: number;
+  repairThreshold: number;
+}
+
+export interface TacticalComparisonResult {
+  id: string;
+  name: string;
+  combo: TacticalCombo;
+  shotsToDestroy: number | null;
+  wallDestroyed: boolean;
+  totalTimeMinutes: number;
+  totalProjectilesUsed: number;
+  totalCounterweightUsed: number;
+  totalRepairMaterialsUsed: number;
+  soldierFatigue: number;
+  nightSuccessRate: number;
+  avgDamagePerShot: number;
+  hitRate: number;
+  costEffectiveness: number;
+  overallScore: number;
+  durabilityCurve: { shot: number; durability: number }[];
+  timestamp: number;
+}
+
+export const TACTICAL_PRESETS: TacticalCombo[] = [
+  {
+    id: 'day_lightning',
+    name: '白昼闪电战',
+    description: '白天晴朗条件下快速连续攻击',
+    timeOfDay: 'day',
+    weather: 'clear',
+    moonPhase: 'full',
+    torchCount: 0,
+    projectileWeight: 8,
+    counterweight: 200,
+    releaseAngle: 45,
+    shotInterval: 15,
+    repairThreshold: 20,
+  },
+  {
+    id: 'night_stealth',
+    name: '夜袭潜行',
+    description: '满月夜借助月光隐蔽攻击',
+    timeOfDay: 'night',
+    weather: 'clear',
+    moonPhase: 'full',
+    torchCount: 2,
+    projectileWeight: 10,
+    counterweight: 250,
+    releaseAngle: 50,
+    shotInterval: 30,
+    repairThreshold: 30,
+  },
+  {
+    id: 'fog_siege',
+    name: '雾天围攻',
+    description: '大雾掩护下近距离强攻',
+    timeOfDay: 'dawn',
+    weather: 'fog',
+    moonPhase: 'new',
+    torchCount: 5,
+    projectileWeight: 15,
+    counterweight: 300,
+    releaseAngle: 40,
+    shotInterval: 25,
+    repairThreshold: 25,
+  },
+  {
+    id: 'rain_heavy',
+    name: '雨夜重锤',
+    description: '雨夜中使用重型弹丸减缓防守',
+    timeOfDay: 'night',
+    weather: 'rain',
+    moonPhase: 'new',
+    torchCount: 8,
+    projectileWeight: 20,
+    counterweight: 400,
+    releaseAngle: 55,
+    shotInterval: 45,
+    repairThreshold: 40,
+  },
+];

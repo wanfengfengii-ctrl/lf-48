@@ -17,6 +17,12 @@ import {
   SingleImpactResult,
   SiegeExperimentResult,
   BestParamsSuggestion,
+  EnvironmentParams,
+  DEFAULT_ENVIRONMENT_PARAMS,
+  LogisticsState,
+  DEFAULT_LOGISTICS_STATE,
+  TacticalCombo,
+  TacticalComparisonResult,
 } from '@/types/catapult';
 import { runSimulation, runBatchSimulation } from '@/lib/physics';
 import {
@@ -28,6 +34,14 @@ import {
   runSiegeBatchSimulation,
   calculateWallMaxDurability,
 } from '@/lib/siegePhysics';
+import { modifyWindParams, calculateVisibility, calculateAccuracyModifier } from '@/lib/environment';
+import {
+  calculateShotCost,
+  applyShotCost,
+  restSoldiers,
+  resupply,
+} from '@/lib/logistics';
+import { runTacticalSimulation } from '@/lib/tactical';
 
 interface CatapultState {
   params: CatapultParams;
@@ -48,6 +62,9 @@ interface CatapultState {
   isSiegeSimulating: boolean;
   activeSiegeExperimentId: string | null;
   bestParamsSuggestion: BestParamsSuggestion | null;
+  environmentParams: EnvironmentParams;
+  logisticsState: LogisticsState;
+  tacticalResults: TacticalComparisonResult[];
   setParams: (params: Partial<CatapultParams>) => void;
   resetParams: () => void;
   setWindParams: (params: Partial<WindParams>) => void;
@@ -82,6 +99,16 @@ interface CatapultState {
   loadSiegeExperiment: (id: string) => void;
   setActiveSiegeExperiment: (id: string | null) => void;
   computeBestParams: () => void;
+  setEnvironmentParams: (params: Partial<EnvironmentParams>) => void;
+  resetEnvironmentParams: () => void;
+  resetLogistics: () => void;
+  resupplyLogistics: (projectiles: number, counterweight: number, materials: number) => void;
+  restSoldiers: (minutes: number) => void;
+  consumeShotLogistics: () => boolean;
+  runTacticalSimulation: (combo: TacticalCombo) => void;
+  deleteTacticalResult: (id: string) => void;
+  clearTacticalResults: () => void;
+  loadTacticalCombo: (combo: TacticalCombo) => void;
 }
 
 export const useCatapultStore = create<CatapultState>()(
@@ -105,6 +132,9 @@ export const useCatapultStore = create<CatapultState>()(
       isSiegeSimulating: false,
       activeSiegeExperimentId: null,
       bestParamsSuggestion: null,
+      environmentParams: { ...DEFAULT_ENVIRONMENT_PARAMS },
+      logisticsState: { ...DEFAULT_LOGISTICS_STATE },
+      tacticalResults: [],
 
       setParams: (newParams) => {
         set((state) => ({
@@ -447,6 +477,87 @@ export const useCatapultStore = create<CatapultState>()(
         const { wallParams, targetParams } = get();
         const suggestion = findBestBreakParams(wallParams, targetParams.targetDistance);
         set({ bestParamsSuggestion: suggestion });
+      },
+
+      setEnvironmentParams: (newEnvParams) => {
+        set((state) => ({
+          environmentParams: {
+            ...state.environmentParams,
+            ...newEnvParams,
+            visibility: calculateVisibility({ ...state.environmentParams, ...newEnvParams }),
+          },
+        }));
+      },
+
+      resetEnvironmentParams: () => {
+        set({ environmentParams: { ...DEFAULT_ENVIRONMENT_PARAMS } });
+      },
+
+      resetLogistics: () => {
+        set({ logisticsState: { ...DEFAULT_LOGISTICS_STATE } });
+      },
+
+      resupplyLogistics: (projectiles, counterweight, materials) => {
+        set((state) => ({
+          logisticsState: resupply(state.logisticsState, projectiles, counterweight, materials),
+        }));
+      },
+
+      restSoldiers: (minutes) => {
+        set((state) => ({
+          logisticsState: restSoldiers(state.logisticsState, minutes),
+        }));
+      },
+
+      consumeShotLogistics: () => {
+        const { params, environmentParams, logisticsState } = get();
+        const { cost, canFire } = calculateShotCost(
+          params,
+          environmentParams,
+          logisticsState.soldierStamina,
+          logisticsState.shotsFiredInSession
+        );
+        if (!canFire) return false;
+        set((state) => ({
+          logisticsState: applyShotCost(state.logisticsState, cost),
+        }));
+        return true;
+      },
+
+      runTacticalSimulation: (combo) => {
+        const { wallParams, windParams } = get();
+        const result = runTacticalSimulation(combo, wallParams, windParams, 200);
+        set((state) => ({
+          tacticalResults: [...state.tacticalResults, result],
+        }));
+      },
+
+      deleteTacticalResult: (id) => {
+        set((state) => ({
+          tacticalResults: state.tacticalResults.filter((r) => r.id !== id),
+        }));
+      },
+
+      clearTacticalResults: () => {
+        set({ tacticalResults: [] });
+      },
+
+      loadTacticalCombo: (combo) => {
+        set((state) => ({
+          params: {
+            ...state.params,
+            projectileWeight: combo.projectileWeight,
+            counterweight: combo.counterweight,
+            releaseAngle: combo.releaseAngle,
+          },
+          environmentParams: {
+            ...state.environmentParams,
+            timeOfDay: combo.timeOfDay,
+            weather: combo.weather,
+            moonPhase: combo.moonPhase,
+            torchCount: combo.torchCount,
+          },
+        }));
       },
     }),
     {
