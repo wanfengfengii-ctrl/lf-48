@@ -92,9 +92,10 @@ export default function SchemesPanel() {
                 <YAxis tick={{ fontSize: 11 }} unit="m" />
                 <RechartsTooltip
                   contentStyle={{ fontSize: 12, borderRadius: 6 }}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   formatter={(value: number, _name: string, props: any) => {
                     const { fullName, status } = props.payload;
-                    return [`${value} m (${getStatusLabel(status)})`, fullName];
+                    return [`${value} m (${getStatusLabel(status as 'hit' | 'too_close' | 'too_far')})`, fullName];
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />

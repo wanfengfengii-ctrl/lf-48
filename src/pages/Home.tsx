@@ -1,21 +1,26 @@
 import { useRef, useCallback } from 'react';
-import { Container, Grid, Title, Text, Group, Paper, Badge } from '@mantine/core';
-import { IconCat } from '@tabler/icons-react';
+import { Container, Grid, Title, Text, Group, Paper, Badge, Stack } from '@mantine/core';
+import { IconCat, IconWind } from '@tabler/icons-react';
 import ControlPanel from '@/components/ControlPanel';
+import WindControlPanel from '@/components/WindControlPanel';
 import SimulationCanvas from '@/components/SimulationCanvas';
 import ResultPanel from '@/components/ResultPanel';
 import SchemesPanel from '@/components/SchemesPanel';
+import BatchExperimentPanel from '@/components/BatchExperimentPanel';
+import ExperimentsPanel from '@/components/ExperimentsPanel';
 import { useCatapultStore } from '@/store/catapultStore';
 import { CatapultEngine } from '@/lib/catapultEngine';
 import { runSimulation } from '@/lib/physics';
 
 export default function Home() {
-  const { params, setIsSimulating, setCurrentResult, isSimulating } = useCatapultStore();
+  const { params, windParams, targetParams, setIsSimulating, setCurrentResult, isSimulating } = useCatapultStore();
   const engineRef = useRef<CatapultEngine | null>(null);
   const paramsSnapshotRef = useRef(params);
+  const windSnapshotRef = useRef(windParams);
+  const targetSnapshotRef = useRef(targetParams);
 
   const handleSimulationComplete = useCallback(() => {
-    const result = runSimulation(paramsSnapshotRef.current);
+    const result = runSimulation(paramsSnapshotRef.current, windSnapshotRef.current, targetSnapshotRef.current);
     setCurrentResult(result);
     setIsSimulating(false);
   }, [setCurrentResult, setIsSimulating]);
@@ -24,10 +29,12 @@ export default function Home() {
     if (!engineRef.current || isSimulating) return;
 
     paramsSnapshotRef.current = { ...params };
+    windSnapshotRef.current = { ...windParams };
+    targetSnapshotRef.current = { ...targetParams };
     setIsSimulating(true);
     setCurrentResult(null);
     engineRef.current.launch();
-  }, [params, isSimulating, setCurrentResult, setIsSimulating]);
+  }, [params, windParams, targetParams, isSimulating, setCurrentResult, setIsSimulating]);
 
   const handleReset = useCallback(() => {
     if (engineRef.current) {
@@ -58,16 +65,19 @@ export default function Home() {
               </div>
               <div>
                 <Title order={2} size="h3" c="orange.7">
-                  古代抛石机模拟器
+                  风场与命中精度实验系统
                 </Title>
                 <Text size="sm" c="dimmed">
-                  调整参数模拟投射效果 · 保存方案对比射程与稳定性
+                  古代抛石机模拟器 · 支持风场调节 · 批量发射精度统计 · 多方案对比
                 </Text>
               </div>
             </Group>
             <Group gap="sm">
               <Badge size="lg" color="green" variant="light">
                 靶区: 80-150m
+              </Badge>
+              <Badge size="lg" color="sky" variant="light" leftSection={<IconWind size={12} />}>
+                {windParams.windSpeed > 0 ? `${windParams.windSpeed}m/s` : '无风'}
               </Badge>
               <Badge size="lg" color="orange" variant="light">
                 Matter.js 物理引擎
@@ -77,15 +87,21 @@ export default function Home() {
         </Paper>
 
         <Grid gutter="md">
-          <Grid.Col span={{ base: 12, md: 3, lg: 3 }}>
-            <ControlPanel
-              onLaunch={handleLaunch}
-              onReset={handleReset}
-              disabled={isSimulating}
-            />
+          <Grid.Col span={{ base: 12, md: 3, lg: 2 }}>
+            <Stack gap="md">
+              <ControlPanel
+                onLaunch={handleLaunch}
+                onReset={handleReset}
+                disabled={isSimulating}
+              />
+            </Stack>
           </Grid.Col>
 
-          <Grid.Col span={{ base: 12, md: 6, lg: 6 }}>
+          <Grid.Col span={{ base: 12, md: 3, lg: 2 }}>
+            <WindControlPanel disabled={isSimulating} />
+          </Grid.Col>
+
+          <Grid.Col span={{ base: 12, md: 6, lg: 5 }}>
             <SimulationCanvas
               params={params}
               isSimulating={isSimulating}
@@ -95,8 +111,17 @@ export default function Home() {
             />
           </Grid.Col>
 
-          <Grid.Col span={{ base: 12, md: 3, lg: 3 }}>
+          <Grid.Col span={{ base: 12, md: 12, lg: 3 }}>
             <ResultPanel />
+          </Grid.Col>
+        </Grid>
+
+        <Grid gutter="md" mt="md">
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <BatchExperimentPanel />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <ExperimentsPanel />
           </Grid.Col>
         </Grid>
 
@@ -107,7 +132,7 @@ export default function Home() {
         </Grid>
 
         <Text size="xs" c="dimmed" ta="center" mt="xl" pb="md">
-          抛石机模拟器 · 基于 React + TypeScript + Mantine + Matter.js + Recharts 构建
+          抛石机模拟器 · 风场与命中精度实验系统 · 基于 React + TypeScript + Mantine + Matter.js + Recharts 构建
         </Text>
       </Container>
     </div>

@@ -1,5 +1,5 @@
 import { Group, Slider, NumberInput, Stack, Title, Text, Button, ActionIcon, Tooltip, Divider, Paper, TextInput, Modal } from '@mantine/core';
-import { IconPlayerPlay, IconRefresh, IconDeviceFloppy, IconRotate } from '@tabler/icons-react';
+import { IconPlayerPlay, IconRefresh, IconDeviceFloppy, IconRotate, IconPlayerPlayFilled } from '@tabler/icons-react';
 import { useCatapultStore } from '@/store/catapultStore';
 import { useState } from 'react';
 
@@ -10,7 +10,7 @@ interface ControlPanelProps {
 }
 
 export default function ControlPanel({ onLaunch, onReset, disabled }: ControlPanelProps) {
-  const { params, setParams, resetParams, saveScheme, currentResult } = useCatapultStore();
+  const { params, setParams, resetParams, saveScheme, currentResult, runSingleSimulation, isBatchSimulating } = useCatapultStore();
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [schemeName, setSchemeName] = useState('');
 
@@ -48,6 +48,10 @@ export default function ControlPanel({ onLaunch, onReset, disabled }: ControlPan
       setSchemeName('');
       setSaveModalOpen(false);
     }
+  };
+
+  const handleQuickSimulate = () => {
+    runSingleSimulation();
   };
 
   return (
@@ -191,7 +195,19 @@ export default function ControlPanel({ onLaunch, onReset, disabled }: ControlPan
             color="orange"
             size="md"
           >
-            发射模拟
+            发射模拟 (动画)
+          </Button>
+
+          <Button
+            leftSection={<IconPlayerPlayFilled size={18} />}
+            onClick={handleQuickSimulate}
+            disabled={isBatchSimulating}
+            fullWidth
+            variant="light"
+            color="orange"
+            size="sm"
+          >
+            快速计算 (无动画)
           </Button>
 
           <Group grow>

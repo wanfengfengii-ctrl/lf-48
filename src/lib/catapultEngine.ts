@@ -210,7 +210,9 @@ export class CatapultEngine {
 
   public reset() {
     Composite.clear(this.engine.world, false, true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Events.off(this.engine, 'afterUpdate', null as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Events.off(this.engine, 'beforeUpdate', null as any);
     this.isLaunched = false;
     this.hasLanded = false;

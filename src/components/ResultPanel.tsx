@@ -8,6 +8,9 @@ import {
   IconAlertTriangle,
   IconCircleCheck,
   IconCircleX,
+  IconWind,
+  IconArrowsLeftRight,
+  IconCrosshair,
 } from '@tabler/icons-react';
 import { useCatapultStore } from '@/store/catapultStore';
 import { SimulationResult } from '@/types/catapult';
@@ -47,7 +50,7 @@ function StatusBadge({ status }: { status: SimulationResult['status'] }) {
 }
 
 export default function ResultPanel() {
-  const { currentResult, params } = useCatapultStore();
+  const { currentResult, params, windParams, targetParams } = useCatapultStore();
 
   if (!currentResult) {
     return (
@@ -79,7 +82,18 @@ export default function ResultPanel() {
           <Title order={4} size="h5">
             模拟结果
           </Title>
-          <StatusBadge status={currentResult.status} />
+          <Group gap="xs">
+            {currentResult.isTargetHit ? (
+              <Badge color="green" size="lg" leftSection={<IconCrosshair size={14} />}>
+                命中靶心
+              </Badge>
+            ) : (
+              <Badge color="orange" size="lg" leftSection={<IconCrosshair size={14} />}>
+                未命中靶心
+              </Badge>
+            )}
+            <StatusBadge status={currentResult.status} />
+          </Group>
         </Group>
 
         {isTooClose && (
@@ -173,13 +187,76 @@ export default function ResultPanel() {
               </Stack>
             </Group>
           </Paper>
+
+          <Paper p="sm" withBorder style={{ backgroundColor: '#E0F2FE' }}>
+            <Group gap="xs">
+              <IconArrowsLeftRight size={20} color="#0284C7" />
+              <Stack gap={0}>
+                <Text size="xs" color="dimmed">
+                  横向风偏
+                </Text>
+                <Text fw={700} size="lg">
+                  {currentResult.lateralDeviation > 0 ? '+' : ''}{currentResult.lateralDeviation} m
+                </Text>
+              </Stack>
+            </Group>
+          </Paper>
+
+          <Paper p="sm" withBorder style={{ backgroundColor: currentResult.isTargetHit ? '#DCFCE7' : '#FEE2E2' }}>
+            <Group gap="xs">
+              <IconCrosshair size={20} color={currentResult.isTargetHit ? '#16A34A' : '#DC2626'} />
+              <Stack gap={0}>
+                <Text size="xs" color="dimmed">
+                  偏离靶心
+                </Text>
+                <Text fw={700} size="lg">
+                  {currentResult.targetDeviation} m
+                </Text>
+              </Stack>
+            </Group>
+          </Paper>
+        </SimpleGrid>
+
+        <Divider />
+
+        <Group gap="xs" wrap="nowrap">
+          <IconWind size={18} color="#0EA5E9" />
+          <Text size="sm" fw={500}>
+            风场条件
+          </Text>
+        </Group>
+        <SimpleGrid cols={3} spacing="xs">
+          <Box>
+            <Text size="xs" color="dimmed">
+              风速
+            </Text>
+            <Text size="sm" fw={600}>
+              {windParams.windSpeed} m/s
+            </Text>
+          </Box>
+          <Box>
+            <Text size="xs" color="dimmed">
+              风向
+            </Text>
+            <Text size="sm" fw={600}>
+              {windParams.windDirection}°
+            </Text>
+          </Box>
+          <Box>
+            <Text size="xs" color="dimmed">
+              阻力系数
+            </Text>
+            <Text size="sm" fw={600}>
+              Cd {windParams.dragCoefficient}
+            </Text>
+          </Box>
         </SimpleGrid>
 
         <Divider />
 
         <Box>
           <Text size="sm" fw={500} mb="xs">
-            弹丸轨迹
+            弹丸轨迹 (侧视图)
           </Text>
           <Box style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -217,11 +294,76 @@ export default function ResultPanel() {
                   strokeDasharray="3 3"
                   label={{ value: `${TARGET_MAX_DISTANCE}m`, position: 'top', fontSize: 10, fill: '#22C55E' }}
                 />
+                <ReferenceLine
+                  x={targetParams.targetDistance}
+                  stroke="#EF4444"
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  label={{ value: `靶心${targetParams.targetDistance}m`, position: 'insideTopLeft', fontSize: 10, fill: '#EF4444' }}
+                />
                 <Scatter
                   name="轨迹"
                   data={trajectoryData}
                   fill="#F97316"
                   line={{ stroke: '#F97316', strokeWidth: 2 }}
+                  lineType="joint"
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </Box>
+        </Box>
+
+        <Divider />
+
+        <Box>
+          <Text size="sm" fw={500} mb="xs">
+            横向风偏轨迹 (俯视图)
+          </Text>
+          <Box style={{ height: 150 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  name="距离"
+                  unit="m"
+                  tick={{ fontSize: 11 }}
+                  domain={[0, Math.max(TARGET_MAX_DISTANCE + 30, currentResult.distance + 20)]}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="z"
+                  name="横向偏移"
+                  unit="m"
+                  tick={{ fontSize: 11 }}
+                />
+                <RechartsTooltip
+                  cursor={{ strokeDasharray: '3 3' }}
+                  contentStyle={{ fontSize: 12, borderRadius: 6 }}
+                  formatter={(value: number, name: string) => {
+                    if (name === '横向偏移') return [`${value.toFixed(2)} m`, '横向偏移'];
+                    return [value, name];
+                  }}
+                />
+                <ReferenceLine
+                  x={targetParams.targetDistance}
+                  stroke="#EF4444"
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                />
+                <ReferenceLine
+                  y={0}
+                  stroke="#64748B"
+                  strokeDasharray="2 2"
+                />
+                <Scatter
+                  name="风偏轨迹"
+                  data={currentResult.trajectory3D
+                    .filter((_, i) => i % 5 === 0)
+                    .map((p) => ({ x: p.x, z: p.z }))}
+                  fill="#0EA5E9"
+                  line={{ stroke: '#0EA5E9', strokeWidth: 2 }}
                   lineType="joint"
                 />
               </ScatterChart>

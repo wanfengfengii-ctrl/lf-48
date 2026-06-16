@@ -3,6 +3,7 @@ import { Paper, Box } from '@mantine/core';
 import { CatapultEngine } from '@/lib/catapultEngine';
 import { CatapultParams } from '@/types/catapult';
 import { TARGET_MIN_DISTANCE, TARGET_MAX_DISTANCE } from '@/types/catapult';
+import { useCatapultStore } from '@/store/catapultStore';
 
 interface SimulationCanvasProps {
   params: CatapultParams;
@@ -24,6 +25,7 @@ export default function SimulationCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const prevParamsRef = useRef(params);
+  const { windParams, targetParams } = useCatapultStore();
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -126,6 +128,81 @@ export default function SimulationCanvas({
       ctx.fillText(`${TARGET_MIN_DISTANCE}m`, targetMinX + 4, groundY - 4);
       ctx.fillText(`${TARGET_MAX_DISTANCE}m`, targetMaxX + 4, groundY - 4);
 
+      const targetX = PIVOT_X + targetParams.targetDistance * SCALE;
+      const targetRadiusPx = targetParams.targetRadius * SCALE;
+
+      ctx.beginPath();
+      ctx.arc(targetX, groundY, targetRadiusPx, Math.PI, 0);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+      ctx.fill();
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(targetX, groundY, targetRadiusPx * 0.6, Math.PI, 0);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+      ctx.fill();
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(targetX, groundY, targetRadiusPx * 0.2, Math.PI, 0);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.5)';
+      ctx.fill();
+
+      ctx.fillStyle = '#EF4444';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`靶心 ${targetParams.targetDistance}m`, targetX, groundY - targetRadiusPx - 8);
+
+      if (windParams.windSpeed > 0) {
+        const windDirRad = (windParams.windDirection * Math.PI) / 180;
+        const windArrowLen = Math.min(60, 20 + windParams.windSpeed * 3);
+        const arrowX = overlay.width - 60;
+        const arrowY = 50;
+
+        ctx.strokeStyle = '#0EA5E9';
+        ctx.fillStyle = '#0EA5E9';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+
+        const endX = arrowX + Math.sin(windDirRad) * windArrowLen;
+        const endY = arrowY - Math.cos(windDirRad) * windArrowLen;
+
+        ctx.beginPath();
+        ctx.moveTo(arrowX - Math.sin(windDirRad) * windArrowLen * 0.3, arrowY + Math.cos(windDirRad) * windArrowLen * 0.3);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        const headLen = 10;
+        const headAngle = Math.PI / 6;
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+          endX - headLen * Math.sin(windDirRad - headAngle),
+          endY + headLen * Math.cos(windDirRad - headAngle)
+        );
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+          endX - headLen * Math.sin(windDirRad + headAngle),
+          endY + headLen * Math.cos(windDirRad + headAngle)
+        );
+        ctx.stroke();
+
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${windParams.windSpeed} m/s`, (arrowX + endX) / 2, (arrowY + endY) / 2 - 8);
+
+        const windLabels = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+        const windDirIndex = Math.round(((windParams.windDirection % 360) / 45)) % 8;
+        ctx.font = '10px sans-serif';
+        ctx.fillStyle = '#64748B';
+        ctx.fillText(windLabels[windDirIndex] + '风', (arrowX + endX) / 2, (arrowY + endY) / 2 + 14);
+      }
+
       for (let h = 0; h <= 100; h += 25) {
         const y = groundY - h * SCALE;
         if (y < 20) break;
@@ -139,7 +216,7 @@ export default function SimulationCanvas({
     drawOverlay();
     const interval = setInterval(drawOverlay, 100);
     return () => clearInterval(interval);
-  }, [engineRef]);
+  }, [engineRef, windParams, targetParams]);
 
   return (
     <Paper p="md" radius="md" withBorder shadow="sm" style={{ height: '100%' }}>
